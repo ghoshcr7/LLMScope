@@ -1,4 +1,3 @@
-from string import templatelib
 import time
 
 
@@ -16,6 +15,19 @@ class PrefillAnalyzer:
         max_tokens: int = 256,
         temp: float = 0.7,
     ):
+        # Format prompt with chat template if not already formatted
+        if hasattr(self.loader.tokenizer, "apply_chat_template") and not (
+            prompt.startswith("<|") or prompt.startswith("[INST]")
+        ):
+            try:
+                formatted = self.loader.tokenizer.apply_chat_template(
+                    [{"role": "user", "content": prompt}],
+                    tokenize=False,
+                    add_generation_prompt=True,
+                )
+                prompt = str(formatted)
+            except Exception:
+                pass
 
         ####################################################
         # Tokenization
@@ -43,14 +55,7 @@ class PrefillAnalyzer:
         first_token_time = None
 
         response_text = ""
-
         response_tokens = 0
-
-        print("\nStreaming Response:\n")
-
-        response_text = ""  #to store the response
-
-        response_tokens = 0  #to store the response tokens
 
         for chunk in self.loader.stream_generate(
             prompt,
@@ -60,9 +65,7 @@ class PrefillAnalyzer:
             if first_token_time is None:
                 first_token_time = time.perf_counter()
 
-            print(chunk.text, end="", flush=True)
-
-            response_text = chunk.text
+            response_text += chunk.text
 
             response_tokens += 1
 
