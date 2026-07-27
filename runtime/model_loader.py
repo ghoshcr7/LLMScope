@@ -2,7 +2,7 @@ import logging
 import time
 from typing import Dict, Any
 # pyrefly: ignore [missing-import]
-from mlx_lm import load, generate
+from mlx_lm import load, generate, stream_generate
 # pyrefly: ignore [missing-import]
 from mlx_lm.sample_utils import make_sampler
 
@@ -103,6 +103,34 @@ class ModelLoader:
             "generation_time": self.generation_time,
             "tokens_per_second": tokens_per_second
         }
+    def stream_generate(
+        self,
+        prompt: str,
+        max_tokens: int = 100,
+        temp: float = 0.7,
+        **kwargs,
+    ):
+        """
+        Stream generated text chunks from the model.
+
+        Yields:
+            GeneratedResponse objects from mlx_lm.stream_generate().
+        """
+
+        sampler = kwargs.pop("sampler", None)
+
+        if sampler is None:
+            top_p = kwargs.pop("top_p", 0.0)
+            sampler = make_sampler(temp=temp, top_p=top_p)
+
+        return stream_generate(
+            self.model,
+            self.tokenizer,
+            prompt=prompt,
+            max_tokens=max_tokens,
+            sampler=sampler,
+            **kwargs,
+        )
 
 if __name__ == "__main__":
     # Setup basic logging config when run as a standalone script

@@ -2,6 +2,9 @@ import logging
 import sys
 # pyrefly: ignore [missing-import]
 from runtime.model_loader import ModelLoader
+# pyrefly: ignore [missing-import]
+from runtime.tokenizer import TokenizerExplorer
+from runtime.prefill import PrefillAnalyzer
 
 # Configure logging to keep console clean by default, but report issues
 logging.basicConfig(
@@ -44,14 +47,39 @@ def main() -> None:
                 print("Goodbye!")
                 break
                 
-            print("\n[Generating...]")
+            # Create a TokenizerExplorer for analysis before generation
+            explorer = TokenizerExplorer(loader.tokenizer)
+            analysis = explorer.tokenize(prompt)
+            decoded_tokens = explorer.decode_tokens(analysis["token_ids"])
+            
+            # Print tokenization analysis
+            print("\n===================================================\n")
+            print("Prompt:")
+            print(prompt)
+            print()
+            print("Formatted Prompt:")
+            print(analysis["formatted_prompt"])
+            print()
+            print("Token Count:")
+            print(analysis["token_count"])
+            print()
+            print("Token IDs:")
+            print(analysis["token_ids"])
+            print()
+            print("Decoded Tokens:")
+            print(decoded_tokens)
+            print("\n===================================================\n")
+            
+            print("[Generating...]")
             
             # Generate the response
-            result = loader.generate(
+            profiler = PrefillAnalyzer(loader)
+
+            result = profiler.analyze(
                 prompt=prompt,
                 max_tokens=256,
                 temp=0.7
-            )
+)
             
             # Extract clean model name for display
             model_display_name = loader.model_name.split("/")[-1]
@@ -59,33 +87,48 @@ def main() -> None:
                 if suffix in model_display_name:
                     model_display_name = model_display_name.split(suffix)[0]
             
-            # Print output details in the requested format
+            print("\n===================================================")
+            print("LLMScope Runtime Profiler")
+            print("===================================================\n")
+
+            print(f"Model                 : {model_display_name}")
+            print(f"Backend               : MLX")
+            print(f"Model Load Time       : {loader.model_load_time:.2f} sec")
+
+            print("\n---------------- Prefill ----------------\n")
+
+            print(f"Prompt Tokens         : {result['prompt_tokens']}")
+
+            print(
+                f"Tokenization Time     : {result['tokenization_time']*1000:.2f} ms"
+            )
+
+            print(
+                f"TTFT                  : {result['ttft']*1000:.2f} ms"
+            )
+
+            print(
+                f"Estimated Prefill     : {result['estimated_prefill']*1000:.2f} ms"
+            )
+
+            print("\n---------------- Decode ----------------\n")
+
+            print(f"Response Tokens       : {result['response_tokens']}")
+
+            print(
+                f"Decode Time           : {result['decode_time']:.2f} sec"
+            )
+
+            print(
+                f"Generation Time       : {result['generation_time']:.2f} sec"
+            )
+
+            print(
+                f"Tokens / Second       : {result['tokens_per_second']:.2f}"
+            )
+
             print("\n===================================================\n")
-            print("Model:")
-            print(model_display_name)
-            print()
-            print("Model Load Time:")
-            print(f"{loader.model_load_time:.2f} sec")
-            print()
-            print("Prompt:")
-            print(result['prompt'])
-            print()
-            print("Response:")
-            print(result['response'].strip())
-            print()
-            print("Prompt Tokens:")
-            print(result['prompt_tokens'])
-            print()
-            print("Response Tokens:")
-            print(result['response_tokens'])
-            print()
-            print("Generation Time:")
-            print(f"{result['generation_time']:.2f} sec")
-            print()
-            print("Tokens/sec:")
-            print(f"{result['tokens_per_second']:.1f}")
-            print("\n===================================================\n")
-            
+                        
         except (KeyboardInterrupt, EOFError):
             print("\nGoodbye!")
             break
