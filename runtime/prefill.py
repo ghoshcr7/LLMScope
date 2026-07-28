@@ -57,6 +57,7 @@ class PrefillAnalyzer:
         response_text = ""
         response_tokens = 0
 
+        finish_reason_raw = None
         for chunk in self.loader.stream_generate(
             prompt,
             max_tokens=max_tokens,
@@ -69,11 +70,18 @@ class PrefillAnalyzer:
 
             response_tokens += 1
 
+            chunk_finish = getattr(chunk, "finish_reason", None)
+            if chunk_finish:
+                finish_reason_raw = chunk_finish
+
         generation_end = time.perf_counter()
 
         ####################################################
         # Metrics
         ####################################################
+
+        if first_token_time is None:
+            first_token_time = generation_end
 
         ttft = first_token_time - generation_start
 
@@ -92,14 +100,28 @@ class PrefillAnalyzer:
             else 0
         )
 
+        # Format human-readable finish reason
+        if finish_reason_raw == "length" or response_tokens >= max_tokens:
+            finish_reason = "Maximum Token Limit Reached"
+        elif finish_reason_raw == "stop":
+            finish_reason = "Stop Token"
+        elif finish_reason_raw in ("eos", "eos_token"):
+            finish_reason = "End of Sequence"
+        elif finish_reason_raw:
+            finish_reason = str(finish_reason_raw)
+        else:
+            finish_reason = "Stop Token"
+
         return {
             "response": response_text,
             "prompt_tokens": prompt_tokens,
             "response_tokens": response_tokens,
+            "max_tokens": max_tokens,
             "tokenization_time": tokenization_time,
             "ttft": ttft,
             "estimated_prefill": estimated_prefill,
             "decode_time": decode_time,
             "generation_time": total_generation,
             "tokens_per_second": tps,
+            "finish_reason": finish_reason,
         }
